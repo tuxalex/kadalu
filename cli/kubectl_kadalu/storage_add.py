@@ -46,6 +46,16 @@ def storage_add_args(subparsers):
         action="append"
     )
     parser_add_storage.add_argument(
+        "--storageclass",
+        help="Kubernetes StorageClass to use, Example: --storageclass local-path",
+        default=None
+    )
+    parser_add_storage.add_argument(
+        "--volsize",
+        help="PV size when storageclass is used (default 1Gi), Example: --storageclass  local-path --volsize 10Gi",
+        default=None
+    )
+    parser_add_storage.add_argument(
         "--external",
         help="Storage from external gluster, Example: --external gluster-node:/gluster-volname",
         default=None
@@ -89,7 +99,7 @@ def storage_add_validation(args):
     if not args.type:
         args.type = "Replica1"
 
-    num_storages = (len(args.device) + len(args.path) + len(args.pvc)) or \
+    num_storages = (len(args.device) + len(args.path) + len(args.pvc) + len(args.storageclass) ) or \
                    (1 if args.external is not None else 0)
 
     if num_storages == 0:
@@ -207,6 +217,15 @@ def storage_add_data(args):
             content["spec"]["storage"].append(
                 {
                     "pvc": pvc
+                }
+            )
+
+    # If StorageClass is specified
+    if args.storageclass:
+        content["spec"]["storage"].append(
+                {
+                    "storageclass": storageclass,
+                    "volsize": volsize
                 }
             )
 

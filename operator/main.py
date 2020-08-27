@@ -53,6 +53,9 @@ def bricks_validation(bricks):
         if brick.get("pvc", None) is not None:
             continue
 
+        if brick.get("storageclass", None) is not None:
+            continue
+
         if brick.get("path", None) is None and \
            brick.get("device", None) is None:
             logging.error(logf("Storage path/device not specified", number=idx+1))
@@ -205,6 +208,8 @@ def update_config_map(core_v1_client, obj):
             "host_brick_path": storage.get("path", ""),
             "brick_device": storage.get("device", ""),
             "pvc_name": storage.get("pvc", ""),
+            "storageclass_name": storage.get("storageclass", ""),
+            "pv_size": storage.get("volsize", "1Gi"),
             "brick_device_dir": get_brick_device_dir(storage),
             "brick_index": idx
         })
@@ -272,6 +277,8 @@ def deploy_server_pods(obj):
         template_args["brick_index"] = idx
         template_args["brick_device"] = storage.get("device", "")
         template_args["pvc_name"] = storage.get("pvc", "")
+        template_args["storageclass_name"] = storage.get("storageclass", "")
+        template_args["pv_size"] = storage.get("volsize", "1Gi")
         template_args["brick_device_dir"] = get_brick_device_dir(storage)
         template_args["brick_node_id"] = storage["node_id"]
         template_args["k8s_dist"] = K8S_DIST

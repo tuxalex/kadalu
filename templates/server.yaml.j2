@@ -64,12 +64,6 @@ spec:
               value: {{ voltype }}
             - name: BRICK_PATH
               value: {{ brick_path }}
-            - name: NODEID
-              value: {{ brick_node_id }}
-            - name: VOLUME_ID
-              value: {{ volume_id }}
-            - name: BRICK_INDEX
-              value: "{{ brick_index }}"
             - name: BRICK_DEVICE
               value: "{{ brick_device }}"
             - name: KADALU_VERSION
@@ -111,12 +105,6 @@ spec:
               value: {{ voltype }}
             - name: BRICK_PATH
               value: {{ brick_path }}
-            - name: NODEID
-              value: {{ brick_node_id }}
-            - name: VOLUME_ID
-              value: {{ volume_id }}
-            - name: BRICK_INDEX
-              value: "{{ brick_index }}"
             - name: KADALU_SERVER_ROLE
               value: "quotad"
             - name: SUBVOL_ROOT
@@ -148,12 +136,6 @@ spec:
               value: {{ voltype }}
             - name: BRICK_PATH
               value: {{ brick_path }}
-            - name: NODEID
-              value: {{ brick_node_id }}
-            - name: VOLUME_ID
-              value: {{ volume_id }}
-            - name: BRICK_INDEX
-              value: "{{ brick_index }}"
             - name: KADALU_SERVER_ROLE
               value: "shd"
             - name: SUBVOL_ROOT
@@ -184,6 +166,7 @@ spec:
         - name: glusterfsd-volfilesdir
           configMap:
             name: "kadalu-info"
+
         - name: glusterfsd-mountdir
 {%- if pvc_name != "" %}
           persistentVolumeClaim:
@@ -200,4 +183,18 @@ spec:
           hostPath:
             path: "{{ brick_device_dir }}"
             type: Directory
+{%- endif %}
+{%- if storageclass_name != "" %}
+    volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumClaim
+      metadata:
+        name: glusterfsd-mountdir
+      spec:
+       accessModes:
+       - ReadWriteMany
+       resources:
+         requests:
+         storage: {{ pv_size }}
+         storageClassName: {{ storageclass_name }}
 {%- endif %}
