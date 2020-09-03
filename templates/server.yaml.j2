@@ -210,9 +210,9 @@ spec:
         name: glusterfsd-mountdir
       spec:
        accessModes:
-       - ReadWriteMany
+       - ReadWriteOnce
        resources:
          requests:
-         storage: {{ pv_size }}
+           storage: {{ pv_size }}
          storageClassName: {{ storageclass_name }}
 {%- endif %}
