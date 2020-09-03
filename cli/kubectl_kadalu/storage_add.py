@@ -226,12 +226,14 @@ def storage_add_data(args):
 
     # If StorageClass is specified
     if args.storageclass:
-        content["spec"]["storage"].append(
-                {
-                    "storageclass": storageclass,
-                    "volsize": volsize
-                }
-            )
+        for storageclass in args.storageclass:
+            for volsize in args.volsize:
+                content["spec"]["storage"].append(
+                    {
+                        "storageclass": storageclass,
+                        "volsize": volsize
+                    }
+                )
 
     # TODO: Support for different port can be added later
     if args.type == "Replica2":

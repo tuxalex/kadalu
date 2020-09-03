@@ -22,6 +22,10 @@ STORAGE_PATH_TMPL = """    - node: "${node}"
 STORAGE_PVC_TMPL = """    - pvc: "${pvc}"
 """
 
+STORAGE_STORAGECLASS_TMPL = """   - storageclass: "${storageclass}"
+     volsize: "${volsize}"
+"""
+
 EXTERNAL_TMPL = """    - gluster_host: "${gluster_host}"
       gluster_volname: "${gluster_volname}"
       gluster_options: "${gluster_options}"
@@ -51,6 +55,9 @@ def to_storage_yaml(data):
                 yaml += Template(STORAGE_PATH_TMPL).substitute(**storage)
             elif storage.get("pvc", None) is not None:
                 yaml += Template(STORAGE_PVC_TMPL).substitute(**storage)
+            elif storage.get("storageclass", None) is not None:
+                yaml += Template(STORAGE_STORAGECLASS_TMPL).substitute(**storage)
+
 
     if data["spec"].get("details", None) is not None:
         yaml += "  details:\n"

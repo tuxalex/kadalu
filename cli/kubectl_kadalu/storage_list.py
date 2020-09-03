@@ -17,6 +17,8 @@ class StorageUnit:
         self.path = None
         self.device = None
         self.pvc = None
+        self.storageclass = None
+        self.volsize = 0
 
 
 # noqa # pylint: disable=too-few-public-methods
@@ -76,6 +78,8 @@ def list_storages(cmd_out, _args):
                 storage_unit.path = brick["host_brick_path"]
                 storage_unit.device = brick["brick_device"]
                 storage_unit.pvc = brick["pvc_name"]
+                storage_unit.storageclass = brick["storageclass_name"]
+                storage_unit.volsize = brick["pv_size"]
                 storage_unit.podname = brick["node"].replace(
                     "." + storage.storage_name, "")
                 storage.storage_units.append(storage_unit)
@@ -140,6 +144,9 @@ def detailed_output(storages, args):
                 print("  Path: %s" % storage_unit.path)
             if storage_unit.pvc != "":
                 print("  PVC: %s" % storage_unit.pvc)
+            if storage_unit.storageclass != "":
+                print("  StorageClass: %s" % storage_unit.storageclass)
+                print("  PV Size: %s" % storage_unit.volsize)
 
             print()
 
