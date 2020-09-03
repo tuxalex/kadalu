@@ -8,67 +8,73 @@ from __future__ import print_function
 import os
 import tempfile
 import sys
-import yaml
-from kubectl_kadalu import utils
+import json
+
+import utils
+from storage_yaml import to_storage_yaml
+
 
 # noqa # pylint: disable=too-many-branches
-def storage_add_args(subparsers):
+def set_args(name, subparsers):
     """ add arguments, and their options """
-    parser_add_storage = subparsers.add_parser('storage-add')
-    parser_add_storage.add_argument(
+    parser = subparsers.add_parser(name)
+    arg = parser.add_argument
+
+    arg(
         "name",
         help="Storage Name"
     )
-    parser_add_storage.add_argument(
+    arg(
         "--type",
         help="Storage Type",
         choices=["Replica1", "Replica3", "External", "Replica2"],
         default=None
     )
-    parser_add_storage.add_argument(
+    arg(
         "--device",
         help=("Storage device in <node>:<device> format, "
               "Example: --device kube1.example.com:/dev/vdc"),
         default=[],
         action="append"
     )
-    parser_add_storage.add_argument(
+    arg(
         "--path",
         help=("Storage path in <node>:<path> format, "
               "Example: --path kube1.example.com:/exports/data"),
         default=[],
         action="append"
     )
-    parser_add_storage.add_argument(
+    arg(
         "--pvc",
         help="Storage from pvc, Example: --pvc local-pvc-1",
         default=[],
         action="append"
     )
-    parser_add_storage.add_argument(
+    arg(
         "--storageclass",
         help="Kubernetes StorageClass to use, Example: --storageclass local-path",
         default=None
     )
-    parser_add_storage.add_argument(
+    arg(
         "--volsize",
         help="PV size when storageclass is used (default 1Gi), Example: --storageclass  local-path --volsize 10Gi",
         default=None
     )
-    parser_add_storage.add_argument(
+    arg(
         "--external",
         help="Storage from external gluster, Example: --external gluster-node:/gluster-volname",
         default=None
     )
-    parser_add_storage.add_argument(
+    arg(
         "--tiebreaker",
         help="If type is 'Replica2', one can have a tiebreaker node along "
         "with it. like '--tiebreaker tie-breaker-node-name:/data/tiebreaker'",
         default=None
     )
+    utils.add_global_flags(parser)
 
 
-def storage_add_validation(args):
+def validate(args):
     """ validate arguments """
     if args.external is not None:
         if args.type and args.type != "External":
@@ -114,51 +120,49 @@ def storage_add_validation(args):
               file=sys.stderr)
         sys.exit(1)
 
-    kube_nodes = get_kube_nodes()
+    kube_nodes = get_kube_nodes(args)
 
     for dev in args.device:
         if ":" not in dev:
             print("Invalid storage device details. Please specify device "
                   "details in the format <node>:<device>", file=sys.stderr)
             sys.exit(1)
-        if dev.split(":")[0] not in kube_nodes:
+        if (not args.dry_run) and (dev.split(":")[0] not in kube_nodes):
             print("Node name does not appear to be valid: " + dev)
-
+            sys.exit(1)
 
     for path in args.path:
         if ":" not in path:
             print("Invalid storage path details. Please specify path "
                   "details in the format <node>:<path>", file=sys.stderr)
             sys.exit(1)
-        if path.split(":")[0] not in kube_nodes:
-            print("Node name does not appear to be valid: " + path)
 
-def get_kube_nodes():
+        if (not args.dry_run) and (path.split(":")[0] not in kube_nodes):
+            print("Node name does not appear to be valid: " + path)
+            sys.exit(1)
+
+
+def get_kube_nodes(args):
     """ gets all nodes  """
+    if args.dry_run:
+        return []
+
+    cmd = [args.kubectl_cmd, "get", "nodes", "-ojson"]
     try:
-        #cmd = ["kubectl", "get", "nodes", "--no-headers", "-o", "custom-columns=':metadata.name'"]
-        # above returns <none>
-        cmd = ["kubectl", "get", "nodes"]
         resp = utils.execute(cmd)
-        print("The following nodes are available")
-        print(resp.stdout)
+        data = json.loads(resp.stdout)
         nodes = []
-        for line in resp.stdout.split("\n"):
-            # The last line is empty thus ignore as otherwise we get an
-            # IndexError: list index out of range
-            line = line.strip()
-            if not line:
-                continue
-            nodename = line.split()[0]
-            if nodename != "NAME":
-                nodes.append(nodename)
+        for nodedata in data["items"]:
+            nodes.append(nodedata["metadata"]["name"])
+
+        print("The following nodes are available:\n  %s" % ", ".join(nodes))
+        print()
         return nodes
     except utils.CommandError as err:
-        print("Error while running the following command", file=sys.stderr)
-        print("$ " + " ".join(cmd), file=sys.stderr)
-        print("", file=sys.stderr)
-        print(err.stderr, file=sys.stderr)
-        sys.exit(1)
+        utils.command_error(cmd, err.stderr)
+    except FileNotFoundError:
+        utils.kubectl_cmd_help(args.kubectl_cmd)
+
 
 def storage_add_data(args):
     """ Build the config file """
@@ -241,30 +245,43 @@ def storage_add_data(args):
     return content
 
 
-def subcmd_storage_add(args):
+def run(args):
     """ Adds the subcommand arguments back to main CLI tool """
     data = storage_add_data(args)
+
+    yaml_content = to_storage_yaml(data)
+    print("Storage Yaml file for your reference:\n")
+    print(yaml_content)
+
+    if args.dry_run:
+        return
+
+    if not args.script_mode:
+        answer = ""
+        valid_answers = ["yes", "no", "n", "y"]
+        while answer not in valid_answers:
+            answer = input("Is this correct?(Yes/No): ")
+            answer = answer.strip().lower()
+
+        if answer in ["n", "no"]:
+            return
 
     config, tempfile_path = tempfile.mkstemp(prefix="kadalu")
     try:
         with os.fdopen(config, 'w') as tmp:
-            yaml.dump(data, tmp)
+            tmp.write(yaml_content)
 
-        cmd = [utils.KUBECTL_CMD, "create", "-f", tempfile_path]
+        cmd = [args.kubectl_cmd, "create", "-f", tempfile_path]
         resp = utils.execute(cmd)
         print("Storage add request sent successfully")
         print(resp.stdout)
         print()
-        print("Storage Yaml file for your reference:")
-        print(yaml.dump(data))
-        print()
-
-    #noqa #pylint : disable=R0801
     except utils.CommandError as err:
-        print("Error while running the following command", file=sys.stderr)
-        print("$ " + " ".join(cmd), file=sys.stderr)
-        print("", file=sys.stderr)
-        print(err.stderr, file=sys.stderr)
-        sys.exit(1)
-    finally:
         os.remove(tempfile_path)
+        utils.command_error(cmd, err.stderr)
+    except FileNotFoundError:
+        os.remove(tempfile_path)
+        utils.kubectl_cmd_help(args.kubectl_cmd)
+    finally:
+        if os.path.exists(tempfile_path):
+            os.remove(tempfile_path)

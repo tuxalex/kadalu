@@ -212,6 +212,6 @@ spec:
             - name: KADALU_VERSION
               value: "master"
             - name: KUBELET_DIR
-              value: "/var/snap/microk8s/common/var/lib/kubelet"
+              value: "/opt/rke/var/lib/kubelet"
             - name: K8S_DIST
-              value: "microk8s"
+              value: "rke"

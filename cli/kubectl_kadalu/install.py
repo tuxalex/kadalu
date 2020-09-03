@@ -4,32 +4,40 @@
 #To prevent Py2 to interpreting print(val) as a tuple.
 from __future__ import print_function
 
-import sys
+import utils
+from version import VERSION
 
-from kubectl_kadalu import utils
 
-def install_args(subparsers):
+def set_args(name, subparsers):
     """ add arguments to argparser """
-    parser_install = subparsers.add_parser('install')
-    parser_install.add_argument(
+    parser = subparsers.add_parser(name)
+    arg = parser.add_argument
+
+    arg(
         "--version",
         help="Kadalu Version to Install [default: latest]",
-        choices=["0.7.0", "master", "latest"],
+        choices=[VERSION, "master", "latest"],
         default="latest"
     )
-    parser_install.add_argument(
+    arg(
         "--type",
         help="Type of installation - k8s/openshift [default: kubernetes]",
-        choices=["openshift", "kubernetes", "microk8s"],
+        choices=["openshift", "kubernetes", "microk8s", "rke"],
         default="kubernetes"
     )
-    parser_install.add_argument(
+    arg(
         "--local-yaml",
         help="local operator yaml file path"
     )
+    utils.add_global_flags(parser)
 
 
-def subcmd_install(args):
+def validate(_args):
+    """No validation available"""
+    return
+
+
+def run(args):
     """ perform install subcommand """
     operator_file = args.local_yaml
     if not operator_file:
@@ -46,16 +54,16 @@ def subcmd_install(args):
         operator_file = "%s/kadalu-operator%s%s.yaml" % (file_url, insttype, version)
 
     try:
-        cmd = [utils.KUBECTL_CMD, "apply", "-f", operator_file]
-        print("Executing '%s'" % cmd)
+        cmd = [args.kubectl_cmd, "apply", "-f", operator_file]
+        print("Executing '%s'" % " ".join(cmd))
+        if args.dry_run:
+            return
+
         resp = utils.execute(cmd)
         print("Kadalu operator create request sent successfully")
         print(resp.stdout)
         print()
-    #noqa #pylint : disable=R0801
     except utils.CommandError as err:
-        print("Error while running the following command", file=sys.stderr)
-        print("$ " + " ".join(cmd), file=sys.stderr)
-        print("", file=sys.stderr)
-        print(err.stderr, file=sys.stderr)
-        sys.exit(1)
+        utils.command_error(cmd, err.stderr)
+    except FileNotFoundError:
+        utils.kubectl_cmd_help(args.kubectl_cmd)
